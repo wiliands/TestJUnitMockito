@@ -6,6 +6,8 @@ import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -13,11 +15,24 @@ import br.ce.wcaquino.exceptions.NaoPodeDividirPorZeroException;
 
 public class CalculadoraTest {
 	
+	public static StringBuffer ordem = new StringBuffer();
+	
 	Calculadora calc;
 	
 	@Before
 	public void setup() {
 		calc = new Calculadora();
+		ordem.append("1");
+	}
+	
+	@After
+	public void tearDown() {
+		
+	}
+	
+	@AfterClass
+	public static void imprimirOrdem() {
+		System.out.println(ordem.toString());
 	}
 	
 	@Test
@@ -65,8 +80,6 @@ public class CalculadoraTest {
 	public void testeMock() {
 		calc = mock(Calculadora.class);
 		when(calc.somar(eq(1), anyInt())).thenReturn(4);
-		
-		System.out.println(calc.somar(1, 8));
 	}
 
 }
