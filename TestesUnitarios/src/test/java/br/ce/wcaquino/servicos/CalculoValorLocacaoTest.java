@@ -4,18 +4,21 @@ import static br.ce.wcaquino.builders.FilmeBuilder.umFilme;
 import static br.ce.wcaquino.builders.UsuarioBuilder.umUsuario;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.mockito.Mockito.mock;
 
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 import br.ce.wcaquino.daos.LocacaoDAO;
 import br.ce.wcaquino.entidades.Filme;
@@ -27,9 +30,12 @@ import br.ce.wcaquino.exceptions.LocadoraException;
 @RunWith(Parameterized.class)
 public class CalculoValorLocacaoTest {
 	
+	@InjectMocks
 	public LocacaoService service;
 	
+	@Mock
 	private LocacaoDAO dao;
+	@Mock
 	private SPCService spcService;
 	
 	@Parameter
@@ -51,13 +57,14 @@ public class CalculoValorLocacaoTest {
 	
 	@Before
 	public void setup() {
-		service = new LocacaoService();
+		MockitoAnnotations.initMocks(this);
 		
-		dao = mock(LocacaoDAO.class);
-		spcService = mock(SPCService.class);
-		
-		service.setLocacaoDAO(dao);
-		service.setSPCService(spcService);
+		CalculadoraTest.ordem.append("4");
+	}
+	
+	@AfterClass
+	public static void imprimirOrdem() {
+		System.out.println(CalculadoraTest.ordem.toString());
 	}
 	
 	@Parameters(name = "{2}")
@@ -73,10 +80,12 @@ public class CalculoValorLocacaoTest {
 	}
 	
 	@Test
-	public void deveCalcularValorLocacaoConsiderandoDescontos() throws LocadoraException, FilmeSemEstoqueException {
+	public void deveCalcularValorLocacaoConsiderandoDescontos() throws LocadoraException, FilmeSemEstoqueException, InterruptedException {
 		//cenario
 		Usuario usuario = umUsuario().getUsuario();
-
+		
+		Thread.sleep(5000);
+		
 		//acao
 		Locacao resultado = service.alugarFilme(usuario, filmes);
 		

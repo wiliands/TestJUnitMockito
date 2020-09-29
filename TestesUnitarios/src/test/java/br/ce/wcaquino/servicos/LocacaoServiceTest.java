@@ -15,23 +15,30 @@ import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ErrorCollector;
 import org.junit.rules.ExpectedException;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.mockito.Spy;
 
 import br.ce.wcaquino.daos.LocacaoDAO;
 import br.ce.wcaquino.entidades.Filme;
@@ -41,43 +48,46 @@ import br.ce.wcaquino.exceptions.FilmeSemEstoqueException;
 import br.ce.wcaquino.exceptions.LocadoraException;
 import br.ce.wcaquino.utils.DataUtils;
 
- public class LocacaoServiceTest {
+public class LocacaoServiceTest {
 	
 	@Rule
 	public ErrorCollector error = new ErrorCollector();
 	
 	@Rule
 	public ExpectedException exceptions = ExpectedException.none();
-	
+
+	@InjectMocks @Spy
 	private LocacaoService service;
 	
+	@Mock
 	private LocacaoDAO dao;
+	@Mock
 	private SPCService spcService;
+	@Mock
 	private EmailService emailService;
 	
 	private int diasDiferenca;
 	
 	@Before
 	public void setup() {
-		service = new LocacaoService();
-		
-		dao = mock(LocacaoDAO.class);
-		spcService = mock(SPCService.class);
-		emailService = mock(EmailService.class);
-		
-		service.setLocacaoDAO(dao);
-		service.setSPCService(spcService);
-		service.setEmailService(emailService);
+		MockitoAnnotations.initMocks(this);
+		//service = PowerMockito.spy(service);
 		
 		diasDiferenca = 1;
 		if(DataUtils.verificarDiaSemana(new Date(), Calendar.SATURDAY)) {
 			diasDiferenca++;
 		}
 		
+		CalculadoraTest.ordem.append("2");
 	}
 	
 	@After
 	public void tearDown() {
+	}
+	
+	@AfterClass
+	public static void imprimirOrdem() {
+		System.out.println(CalculadoraTest.ordem.toString());
 	}
 
 	@Test
@@ -137,9 +147,11 @@ import br.ce.wcaquino.utils.DataUtils;
 	}
 	
 	@Test
-	public void deveDevolverNaSegundaQuandoAlugadoNoSabado() throws LocadoraException, FilmeSemEstoqueException {
+	public void deveDevolverNaSegundaQuandoAlugadoNoSabado() throws Exception {
 		//define uma condicao para executar o teste
 		//assumeTrue(DataUtils.verificarDiaSemana(new Date(), Calendar.SATURDAY));
+		
+		doReturn(DataUtils.obterData(26, 9, 2020)).when(service).obterData();
 		
 		//cenario
 		Usuario usuario = umUsuario().getUsuario();
@@ -150,10 +162,11 @@ import br.ce.wcaquino.utils.DataUtils;
 		
 		//verificacao
 		assertThat(resultado.getDataRetorno(), caiNaSegunda());
+		
 	}
 	
 	@Test
-	public void naoDeveAlugarFilmeParaNegativadoSPC() throws FilmeSemEstoqueException {
+	public void naoDeveAlugarFilmeParaNegativadoSPC() throws Exception {
 		//cenario
 		Usuario usuario = umUsuario().getUsuario();
 		List<Filme> filmes = Arrays.asList(umFilme().getFilme());
@@ -198,8 +211,58 @@ import br.ce.wcaquino.utils.DataUtils;
 
 	}
 	
-//	public static void main(String[] args) {
-//		new BuilderMaster().gerarCodigoClasse(Locacao.class);
-//	}
+	@Test
+	public void deveTratarErrorNoSPC() throws Exception {
+		//cenario
+		Usuario usuario = umUsuario().getUsuario();
+		List<Filme> filmes = Arrays.asList(umFilme().getFilme());
+		
+		when(spcService.possuiNegativacao(usuario)).thenThrow(new Exception("Falha SPC"));
+		
+		exceptions.expect(LocadoraException.class);
+		exceptions.expectMessage("Problema com SPC fora do ar");
+		//exceptions.expectMessage("Falha SPC");
+		
+		//acao
+		service.alugarFilme(usuario, filmes);
+		
+		//verificacao
+	}
+	
+	@Test
+	public void deveProrrogarUmaLocacao() {
+		//cenario
+		Locacao locacao = umLocacao().getLocacao();
+		
+		//acao
+		service.prorrogarLocacao(locacao, 3);
+		
+		//verificacao
+		ArgumentCaptor<Locacao> argCaptor = ArgumentCaptor.forClass(Locacao.class);
+		verify(dao).salvar(argCaptor.capture());
+		Locacao locacaoRetornada = argCaptor.getValue();
+		
+		error.checkThat(locacaoRetornada.getValor(), is(12.0));
+		error.checkThat(locacaoRetornada.getDataLocacao(), ehHoje());
+		error.checkThat(locacaoRetornada.getDataRetorno(), ehHojeComDiferencaDias(3));
+		
+	}
+	
+	@Test
+	public void deveCalcularValorLocacao() throws Exception {
+		//cenario
+		List<Filme> filmes = Arrays.asList(umFilme().getFilme());
+		
+		//acao
+		Class<LocacaoService> classe = LocacaoService.class;
+		Method metodo = classe.getDeclaredMethod("calcularPrecoLocacao", List.class);
+		metodo.setAccessible(true);
+		
+		Double valorLocacao = (Double) metodo.invoke(service, filmes);
+		
+		//verificaco
+		assertThat(valorLocacao, is(4.0));
+		
+	}
 	
 }
